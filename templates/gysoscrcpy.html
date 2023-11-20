@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <title>GysoScrcpy</title>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+    <script type="text/javascript" src="/static/general/js/Decoder.js"></script>
+    <script type="text/javascript" src="/static/general/js/YUVCanvas.js"></script>
+    <script type="text/javascript" src="/static/general/js/Player.js"></script>
+    <script type="text/javascript" src="/static/general/js/pcm-player.min.js"></script>
+    <meta charset="UTF-8">
+</head>
+<body onselectstart="return false;" unselectable="on">
+<div id='container' style="display: inline-block;"></div>
+<div style="display: inline-block; vertical-align:top;">
+    <div>duration: <em id="player_duration">0</em></div>
+    <div id="error_msg1" style="color: red;display: none;">none</div>
+    <div id="error_msg2" style="color: red;display: none;">none</div>
+    <div>
+        <select id="video_play_select" style="width:100px;height:30px">
+            <option value="broardway">broardway</option>
+            <option value="broardway2">broardway2</option>
+            <option value="webcodecs">webcodecs</option>
+        </select>
+        <button id="reload_button" style="padding:0">
+            <?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+            "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+            <svg t="1686225269004" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+                 p-id="9260" xmlns:xlink="http://www.w3.org/1999/xlink" width="15" height="15">
+                <path d="M848.738462 608.137846c-8.467692 178.097231-155.963077 319.881846-336.659693 319.881846-186.171077 0-337.132308-150.449231-337.132307-336.068923 0-180.145231 142.178462-327.168 320.787692-335.675077v159.82277l353.122461-192.039385L495.734154 0v160.098462C263.995077 168.684308 78.769231 358.754462 78.769231 591.872 78.769231 830.542769 272.777846 1024 512.157538 1024 746.062769 1024 936.644923 839.286154 945.230769 608.137846h-96.492307z"
+                      fill="#28A2FF" p-id="9261"></path>
+            </svg>
+        </button>
+        </button>
+        <button id="sw-state">sw-on</button>
+    </div>
+    <div>
+        <input id="get_clipboard" style="height:40px;width:200px;margin-bottom:5px;">
+        <button id="get_clipboard_button">get_clipboard</button>
+    </div>
+    <div>
+        <input id="set_clipboard" style="height:40px;width:200px;margin-bottom:5px;" placeholder="please paste here">
+        <button id="set_clipboard_button">set clipboard</button>
+    </div>
+    <div>
+        <input id="menu_checkbox" type="checkbox" value="82"/>
+        <button id="menu_button">menu</button>
+        <input id="home_checkbox" type="checkbox" value="3"/>
+        <button id="home_button">home</button>
+        <input id="back_checkbox" type="checkbox" value="4"/>
+        <button id="back_button">back</button>
+    </div>
+    <div>
+        <button id="reload_volume" style="padding:0">
+            <?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+            "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+            <svg t="1686225269004" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+                 p-id="9260" xmlns:xlink="http://www.w3.org/1999/xlink" width="15" height="15">
+                <path d="M848.738462 608.137846c-8.467692 178.097231-155.963077 319.881846-336.659693 319.881846-186.171077 0-337.132308-150.449231-337.132307-336.068923 0-180.145231 142.178462-327.168 320.787692-335.675077v159.82277l353.122461-192.039385L495.734154 0v160.098462C263.995077 168.684308 78.769231 358.754462 78.769231 591.872 78.769231 830.542769 272.777846 1024 512.157538 1024 746.062769 1024 936.644923 839.286154 945.230769 608.137846h-96.492307z"
+                      fill="#28A2FF" p-id="9261"></path>
+            </svg>
+        </button>
+        <input id="v+_checkbox" type="checkbox" value="24"/>
+        <button id="v+_button">v+</button>
+        <input id="v-_checkbox" type="checkbox" value="25"/>
+        <button id="v-_button">v-</button>
+        <input id="power_checkbox" type="checkbox" value="26"/>
+        <button id="power_button">power</button>
+    </div>
+    <div>
+        <button id="multi-key_button">multi-key</button>
+        <a id="capture"></a>
+        <button id="capture_button">capture</button>
+    </div>
+</div>
+</body>
+<script type="module" src="{{ url_for('static', filename='gysoscrcpy.js') }}"></script>
+</html>
