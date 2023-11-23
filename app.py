@@ -86,6 +86,8 @@ def handle_screen_event(data):
         asyncio.run_coroutine_threadsafe(devices_cache[temp_device_id].receive(data), working_loop)
 
 
+
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=8000, allow_unsafe_werkzeug=True)
 
