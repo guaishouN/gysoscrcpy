@@ -30,7 +30,7 @@ let controlInfo = {
 };
 
 const socketHostname = window.location.hostname;
-const socketPort = 5000;
+const socketPort = window.location.port;
 window.h264ParseConfiguration = h264ParseConfiguration
 window.h265ParseConfiguration = h265ParseConfiguration
 
@@ -497,7 +497,7 @@ function handle_config_data(data) {
 function attach_canvas(canvas) {
     let playerElement = $('#container')
     playerElement.innerHTML = ""
-    playerElement.appendChild(canvas)
+    playerElement.append(canvas)
     window.video_renderer_canvas = canvas
     // canvas control support
     if (controlInfo.control !== false) {
@@ -509,7 +509,7 @@ function attach_canvas(canvas) {
 
 function load_video_player() {
     window.canvas_resolution = [0, 0];
-    if ($('#video_play_select').text().startsWith('broardway')) {
+    if ($('#video_play_select').text()) {
         window.video_player = new Player({
             useWorker: true,
             webgl: 'auto',
@@ -532,102 +532,103 @@ function load_video_player() {
             window.video_player.decode(data);
         }
         attach_canvas(window.video_player.canvas)
-    } else {
-        try {
-            window.video_decoder = new VideoDecoder({
-                output: function (frame) {
-                    window.video_renderer_context.drawImage(frame, 0, 0);
-                    frame.close();
-                },
-                error: function (e) {
-                    console.log(e)
-                }
-            })
-        } catch (e) {
-            errorMsgView.css('display', 'block');
-            errorMsgView.innerHTML = "Error: no video webcodecs support!";
-            throw e;
-        }
-        if (controlInfo.video_codec === 'h264') {
-            window.video_player_feed = function (data) {
-                if (data[4] === 103) {
-                    const {
-                        profileIndex,
-                        constraintSet,
-                        levelIndex,
-                        croppedWidth,
-                        croppedHeight,
-                    } = window.h264ParseConfiguration(data);
-                    window.canvas_resolution = [croppedWidth, croppedHeight];
-                    update_resolution();
-                    const codec = `avc1.${[profileIndex, constraintSet, levelIndex].map(toHex).join("")}`
-                    window.video_decoder.configure({codec: codec, optimizeForLatency: true})
-                    let video_renderer_canvas = document.createElement("canvas")
-                    video_renderer_canvas.width = croppedWidth;
-                    video_renderer_canvas.height = croppedHeight;
-                    attach_canvas(video_renderer_canvas)
-                    window.video_config_data = data
-                    window.video_renderer_context = video_renderer_canvas.getContext("2d")
-                } else {
-                    // 第一个key贞必须拼接上配置贞
-                    data = handle_config_data(data)
-                    const chunk = new EncodedVideoChunk({
-                        type: data[4] in [101, 69, 37] ? "key" : "delta",
-                        timestamp: 0,
-                        data: data
-                    })
-                    window.video_decoder.decode(chunk)
-                }
-            }
-        } else if (controlInfo.video_codec === 'h265') {
-            window.video_player_feed = function (data) {
-                let video_renderer_canvas;
-                if (data[4] === 64) {
-                    const {
-                        generalProfileSpace,
-                        generalProfileIndex,
-                        generalProfileCompatibilitySet,
-                        generalTierFlag,
-                        generalLevelIndex,
-                        generalConstraintSet,
-                        croppedWidth,
-                        croppedHeight,
-                    } = window.h265ParseConfiguration(data);
-                    window.canvas_resolution = [croppedWidth, croppedHeight];
-                    update_resolution();
-                    const codec = ["hev1",
-                        ["", "A", "B", "C"][generalProfileSpace] +
-                        generalProfileIndex.toString(),
-                        toUint32Le(generalProfileCompatibilitySet, 0).toString(16),
-                        (generalTierFlag ? "H" : "L") +
-                        generalLevelIndex.toString(),
-                        toUint32Le(generalConstraintSet, 0)
-                            .toString(16)
-                            .toUpperCase(),
-                        toUint32Le(generalConstraintSet, 4)
-                            .toString(16)
-                            .toUpperCase(),
-                    ].join(".")
-                    window.video_decoder.configure({codec: codec, optimizeForLatency: true})
-                    video_renderer_canvas = document.createElement("canvas")
-                    video_renderer_canvas.width = croppedWidth;
-                    video_renderer_canvas.height = croppedHeight;
-                    attach_canvas(video_renderer_canvas)
-                    window.video_config_data = data
-                    window.video_renderer_context = video_renderer_canvas.getContext("2d")
-                } else {
-                    // 第一个key贞必须拼接上配置贞
-                    data = handle_config_data(data)
-                    const chunk = new EncodedVideoChunk({
-                        type: data[4] in [38] ? "key" : "delta",
-                        timestamp: 0,
-                        data: data
-                    })
-                    window.video_decoder.decode(chunk)
-                }
-            }
-        }
     }
+    // else {
+    //     try {
+    //         window.video_decoder = new VideoDecoder({
+    //             output: function (frame) {
+    //                 window.video_renderer_context.drawImage(frame, 0, 0);
+    //                 frame.close();
+    //             },
+    //             error: function (e) {
+    //                 console.log(e)
+    //             }
+    //         })
+    //     } catch (e) {
+    //         errorMsgView.css('display', 'block');
+    //         errorMsgView.innerHTML = "Error: no video webcodecs support!";
+    //         throw e;
+    //     }
+    //     if (controlInfo.video_codec === 'h264') {
+    //         window.video_player_feed = function (data) {
+    //             if (data[4] === 103) {
+    //                 const {
+    //                     profileIndex,
+    //                     constraintSet,
+    //                     levelIndex,
+    //                     croppedWidth,
+    //                     croppedHeight,
+    //                 } = window.h264ParseConfiguration(data);
+    //                 window.canvas_resolution = [croppedWidth, croppedHeight];
+    //                 update_resolution();
+    //                 const codec = `avc1.${[profileIndex, constraintSet, levelIndex].map(toHex).join("")}`
+    //                 window.video_decoder.configure({codec: codec, optimizeForLatency: true})
+    //                 let video_renderer_canvas = document.createElement("canvas")
+    //                 video_renderer_canvas.width = croppedWidth;
+    //                 video_renderer_canvas.height = croppedHeight;
+    //                 attach_canvas(video_renderer_canvas)
+    //                 window.video_config_data = data
+    //                 window.video_renderer_context = video_renderer_canvas.getContext("2d")
+    //             } else {
+    //                 // 第一个key贞必须拼接上配置贞
+    //                 data = handle_config_data(data)
+    //                 const chunk = new EncodedVideoChunk({
+    //                     type: data[4] in [101, 69, 37] ? "key" : "delta",
+    //                     timestamp: 0,
+    //                     data: data
+    //                 })
+    //                 window.video_decoder.decode(chunk)
+    //             }
+    //         }
+    //     } else if (controlInfo.video_codec === 'h265') {
+    //         window.video_player_feed = function (data) {
+    //             let video_renderer_canvas;
+    //             if (data[4] === 64) {
+    //                 const {
+    //                     generalProfileSpace,
+    //                     generalProfileIndex,
+    //                     generalProfileCompatibilitySet,
+    //                     generalTierFlag,
+    //                     generalLevelIndex,
+    //                     generalConstraintSet,
+    //                     croppedWidth,
+    //                     croppedHeight,
+    //                 } = window.h265ParseConfiguration(data);
+    //                 window.canvas_resolution = [croppedWidth, croppedHeight];
+    //                 update_resolution();
+    //                 const codec = ["hev1",
+    //                     ["", "A", "B", "C"][generalProfileSpace] +
+    //                     generalProfileIndex.toString(),
+    //                     toUint32Le(generalProfileCompatibilitySet, 0).toString(16),
+    //                     (generalTierFlag ? "H" : "L") +
+    //                     generalLevelIndex.toString(),
+    //                     toUint32Le(generalConstraintSet, 0)
+    //                         .toString(16)
+    //                         .toUpperCase(),
+    //                     toUint32Le(generalConstraintSet, 4)
+    //                         .toString(16)
+    //                         .toUpperCase(),
+    //                 ].join(".")
+    //                 window.video_decoder.configure({codec: codec, optimizeForLatency: true})
+    //                 video_renderer_canvas = document.createElement("canvas")
+    //                 video_renderer_canvas.width = croppedWidth;
+    //                 video_renderer_canvas.height = croppedHeight;
+    //                 attach_canvas(video_renderer_canvas)
+    //                 window.video_config_data = data
+    //                 window.video_renderer_context = video_renderer_canvas.getContext("2d")
+    //             } else {
+    //                 // 第一个key贞必须拼接上配置贞
+    //                 data = handle_config_data(data)
+    //                 const chunk = new EncodedVideoChunk({
+    //                     type: data[4] in [38] ? "key" : "delta",
+    //                     timestamp: 0,
+    //                     data: data
+    //                 })
+    //                 window.video_decoder.decode(chunk)
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 function load_websocket() {

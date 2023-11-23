@@ -3,13 +3,12 @@ import json
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
-
 from flask import Flask, render_template, request, send_file
 from flask_socketio import SocketIO
 from flask_cors import CORS, cross_origin
 import config
 from device_control import DeviceConnector
-from tools.adb import AsyncAdbDevice
+
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
@@ -41,6 +40,17 @@ def back_fun(device_id):
             await devices_cache[device_id].on_connect()
 
     working_loop.run_until_complete(run())
+
+
+@app.route('/getDevices')
+def get_devices():
+    return json.dumps(config.DEFAULT_CONTROL_INFO)
+
+
+@app.route('/device/control/<device_id>/<command>')
+def device_control(device_id, command):
+    logging.info(f"device control on [{device_id}]command[{command}]")
+    return json.dumps(config.DEFAULT_CONTROL_INFO)
 
 
 @app.route('/getCtrlInfo/<device_id>')
@@ -75,6 +85,9 @@ def handle_screen_event(data):
     if temp_device_id in devices_cache and working_loop is not None:
         asyncio.run_coroutine_threadsafe(devices_cache[temp_device_id].receive(data), working_loop)
 
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=8000, allow_unsafe_werkzeug=True)
 
 
 # async def hh():
