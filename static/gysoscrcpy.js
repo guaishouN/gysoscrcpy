@@ -100,11 +100,13 @@ function set_clipboard(text, sequence = 1, paste = true) {
 
 // 10.sw
 function toggle_sw() {
+    const sw = $('#sw-state');
     let screen_power_mode = 2
-    this.textContent = 'sw-on'
-    if (this.textContent === 'sw-on') {
+    if (sw.text() === 'sw-on') {
         screen_power_mode = 0
-        this.textContent = 'sw-off'
+        sw.text('sw-off')
+    }else{
+        sw.text('sw-on')
     }
     msg = {
         msg_type: 10,
@@ -653,8 +655,29 @@ function load_websocket() {
         console.log("Failed connect to device, maybe adb offline !!!");
     });
 
-    window.ws.on('message', function (message){
-        console.log("on message: ",message);
+    window.ws.on('video_nal', function (message){
+        let unit8_data = new Uint8Array(message)
+        console.log("on video_nal: ",unit8_data.length);
+    });
+
+    window.ws.on('audio_nal', function (message){
+        let unit8_data = new Uint8Array(message)
+        console.log("on audio_nal: ",unit8_data.length);
+    });
+
+    window.ws.on('video_header', function (message){
+        let unit8_data = new Uint8Array(message)
+        console.log("on video_header: ",unit8_data.length);
+    });
+
+    window.ws.on('audio_header', function (message){
+        let unit8_data = new Uint8Array(message)
+        console.log("on audio_header: ",unit8_data.length);
+    });
+
+    window.ws.on('other_data', function (message){
+        let unit8_data = new Uint8Array(message)
+        console.log("on other_data: ",message);
     });
 
     window.ws.on('rtp-stream', function (msg){
@@ -737,7 +760,7 @@ function flush_duration() {
 
 $(document).ready(function () {
     $.ajax({
-        url: "/getCtrlInfo/hello",
+        url: "/getCtrlInfo/55fa3d4d",
         method: "GET",
         dataType: "json",
         success: function (ctrlInfo) {

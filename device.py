@@ -6,13 +6,15 @@ import asyncio
 from pathlib import Path
 import datetime
 
+from flask_socketio import SocketIO
+
 from tools.adb import AsyncAdbDevice
 from serializers import format_audio_data
 from constants import sc_control_msg_type, sc_copy_key, sc_screen_power_mode
 from constants.input import android_metastate, android_keyevent_action, android_motionevent_action, \
     android_motionevent_buttons
 logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s', level=logging.INFO)
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 MEDIA_ROOT = '/media/'
 
 
@@ -32,7 +34,10 @@ class DeviceController:
             await self.device.control_socket.write(msg)
 
     async def inject_without_lock(self, msg):
+        print(f"begin inject_without_lock msg  {msg}")
         await self.device.control_socket.write(msg)
+        print(f"finished inject_without_lock msg  {msg}")
+        loop = asyncio.get_running_loop()
 
     async def inject_keycode(self, keycode, action=android_keyevent_action.AKEY_EVENT_ACTION_DOWN, repeat=0,
                        metastate=android_metastate.AMETA_NONE):
@@ -185,11 +190,12 @@ class DeviceClient:
     # socket超时时间,毫秒
     connect_timeout = 300
 
-    def __init__(self, ws_client, scid):
+    def __init__(self, socket_io: SocketIO, scrcpy_kwargs, device_id, scid):
         # scrcpy参数
-        self.scrcpy_kwargs = json.loads(ws_client.query_params['config'][0])
+        self.scrcpy_kwargs = scrcpy_kwargs
         # devices
-        self.device_id = ws_client.device_id
+        self.device_id = device_id
+        print(f"device_id  {device_id}  ")
         self.adb_device = AsyncAdbDevice(self.device_id)
         # 单个安卓设备上scrcpy进程的投屏id
         self.scrcpy_kwargs['scid'] = self.scid = scid
@@ -209,8 +215,8 @@ class DeviceClient:
         self.device_lock = asyncio.Lock()
         # 设备控制器
         self.controller = DeviceController(self)
-        # 需要推流的ws_client
-        self.ws_client = ws_client
+        # 需要推流的socket_io
+        self.socket_io = socket_io
         # 音视频信息
         self.video_audio_info = dict()
         # 录屏相关
@@ -243,7 +249,8 @@ class DeviceClient:
 
     async def deploy_server(self):
         # 1.推送jar包
-        server_file_path = os.path.join(BASE_DIR, "asset/scrcpy-server-v2.1.1")
+        server_file_path = "scrcpy-server"
+        print(f"path file {server_file_path } is exist = {os.path.exists(server_file_path)}")
         await self.adb_device.push_file(server_file_path, "/data/local/tmp/scrcpy-server.jar")
         # 2.启动一个adb socket去部署scrcpy_server
         commands = [
@@ -256,7 +263,7 @@ class DeviceClient:
         ]
         self.deploy_socket = await self.shell(commands)
 
-    async def create_socket(self):
+    async def create_3_channels_socket(self):
         # 1.video_socket
         socket_name = 'localabstract:scrcpy_%s' % self.scrcpy_kwargs['scid']
         self.video_socket = await self.adb_device.create_connection_socket(socket_name, timeout=self.connect_timeout)
@@ -269,6 +276,7 @@ class DeviceClient:
         # 3.control_socket
         if self.scrcpy_kwargs['control']:
             self.control_socket = await self.adb_device.create_connection_socket(socket_name, timeout=self.connect_timeout)
+
         # 4.metadata
         self.device_name = (await self.video_socket.read_exactly(64)).decode("utf-8").rstrip("\x00")
         video_info = (await self.video_socket.read_exactly(12))
@@ -289,7 +297,7 @@ class DeviceClient:
             data = await self.deploy_socket.read_string_line()
             if not data:
                 break
-            logging.info(f"【DeviceClient】({self.device_id}:{self.scid})" + data.rstrip('\r\n').rstrip('\n'))
+            logging.info(f"【DeviceClient】_deploy_task({self.device_id}:{self.scid})" + data.rstrip('\r\n').rstrip('\n'))
 
     async def _video_task(self):
         try:
@@ -302,10 +310,14 @@ class DeviceClient:
                 # 2.向录屏工具写入 当前nal
                 self.write_recoder(pts, data_length, current_nal_data, typ='video')
                 # 3.向前端发送当前nal
-                await self.ws_client.send(bytes_data=current_nal_data)
+                self.socket_io.emit("video_nal", current_nal_data)
+                print(f"current_nal_data send len={len(current_nal_data)}")
+        except Exception as exc:
+            logging.exception(f"_video_task error: {exc}!!!")
         finally:
             # 多次调用ws-close，有且只有一次会生效，所以ws-client的disconnect方法只会执行一次，即stop方法只执行一次
-            await self.ws_client.close()
+            # await self.socket_io.stop()
+            logging.info(f"_video_task socket_io stop!! ")
 
     async def _audio_task(self):
         is_raw = self.scrcpy_kwargs['audio_codec'] == 'raw'
@@ -328,16 +340,19 @@ class DeviceClient:
                     continue
                 elif is_acc and (current_nal_data.find(b'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')>=0):
                     continue
-                await self.ws_client.send(bytes_data=format_audio_data(current_nal_data))
+                self.socket_io.emit("audio_nal", format_audio_data(current_nal_data))
+        except Exception as exc:
+            logging.exception(f"_video_task error: {exc}!!!")
         finally:
             # 多次调用ws-close，有且只有一次会生效，所以ws-client的disconnect方法只会执行一次，即stop方法只执行一次
-            await self.ws_client.close()
+            # await self.socket_io.stop()
+            logging.info(f"_audio_task socket_io stop!! ")
 
     # check login state
     async def check_login_task(self):
         while True:
             await asyncio.sleep(5)
-            if not await self.ws_client.check_login():
+            if not await self.socket_io.check_login():
                 return
             if not self.video_socket:
                 return
@@ -348,7 +363,7 @@ class DeviceClient:
         pts = struct.unpack('>Q', frame_meta[:8])[0]
         data_length = struct.unpack('>L', frame_meta[8:])[0]
         video_config_nal = await self.video_socket.read_exactly(data_length)
-        await self.ws_client.send(bytes_data=video_config_nal)
+        self.socket_io.emit("video_header", video_config_nal)
         self.video_audio_info['video_header'] = [pts, data_length, video_config_nal]
         # 2.audio_config_packet
         if self.scrcpy_kwargs['audio']:
@@ -356,7 +371,7 @@ class DeviceClient:
             pts = struct.unpack('>Q', frame_meta[:8])[0]
             data_length = struct.unpack('>L', frame_meta[8:])[0]
             audio_config_nal = await self.audio_socket.read_exactly(data_length)
-            await self.ws_client.send(bytes_data=format_audio_data(audio_config_nal))
+            self.socket_io.emit("audio_header", format_audio_data(audio_config_nal))
             self.video_audio_info['audio_header'] = [pts, data_length, audio_config_nal]
 
     async def start(self):
@@ -367,7 +382,7 @@ class DeviceClient:
         self.deploy_task = asyncio.create_task(self._deploy_task())
         # 2.create socket and get first config nal
         logging.info(f"【DeviceClient】({self.device_id}:{self.scid}) (2).start socket")
-        await self.create_socket()
+        await self.create_3_channels_socket()
         await self.handle_first_config_nal()
         # 3.start_recorder
         logging.info(f"【DeviceClient】({self.device_id}:{self.scid}) (3).start recorder")
@@ -375,10 +390,12 @@ class DeviceClient:
         # 4.video task
         logging.info(f"【DeviceClient】({self.device_id}:{self.scid}) (4).start video task")
         self.video_task = asyncio.create_task(self._video_task())
+        await self.video_task
         # 5.audio task
         if self.scrcpy_kwargs['audio']:
             logging.info(f"【DeviceClient】({self.device_id}:{self.scid}) (5).start audio task")
             self.audio_task = asyncio.create_task(self._audio_task())
+            await self.audio_task
         # 6.check login task
         # self.video_task = asyncio.create_task(self.check_login_task())
 
@@ -411,7 +428,7 @@ class DeviceClient:
                 self.deploy_task = None
         finally:
             # 5.stop_recorder
-            await self.stop_recorder()
+            self.stop_recorder()
         logging.info(f"【DeviceClient】({self.device_id}:{self.scid}) =======> stopped")
 
     def start_recorder(self):

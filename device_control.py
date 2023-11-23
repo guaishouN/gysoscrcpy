@@ -1,12 +1,18 @@
+import json
 import os
 import random
 import asyncio
 import logging
-from urllib import parse
+
+from flask_socketio import SocketIO
+
+import config
 from device import DeviceClient
 from constants import sc_control_msg_type
 from serializers import ReceiveMsgObj, format_get_clipboard_data, format_set_clipboard_data, format_other_data
-logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s', level=logging.INFO)
+
+logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',
+                    level=logging.INFO)
 """
 {"recorder_enable": false, "recorder_format": "mp4", "audio": true,
  "video_codec": "h264", "audio_codec": "aac", "audio_source": "output", 
@@ -35,30 +41,33 @@ logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelnam
  power_on=true scid=046c7eee
 """
 
-class DeviceWebsocketConsumer():
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+
+class DeviceConnector:
+    is_connected = False
+
+    def __init__(self, device_id: str, socket_io: SocketIO):
         # 投屏的scid,极端情况下会出现scid重复的情况，同一个手机的scrcpy进程scid不能相同
         self.scid = '0' + ''.join([hex(random.randint(0, 15))[-1] for _ in range(7)])
-        self.device_id = None
-        self.query_params = None
+        self.device_id = device_id
+        self.query_params = config.DEFAULT_CONTROL_INFO
         self.device_client = None
+        self.socket_io = socket_io
 
-    async def connect(self):
+    def init_async_worker(self):
+        pass
+
+    async def on_connect(self):
         # 1.获取请求参数
-        self.query_params = parse.parse_qs(self.scope['query_string'].decode('utf-8'))
-        self.device_id = self.scope['url_route']['kwargs']['device_id'].replace(',', '.').replace('_', ':')
-        # 2.获取当前ws_client对应的 device_client
-        await self.accept()
-        logging.info(f"【DeviceWebsocketConsumer】({self.device_id}:{self.scid}) =======> Gyso connected")
-        self.device_client = DeviceClient(self, self.scid)
+        logging.info(f"【DeviceControl】on connect({self.device_id}:{self.scid})")
+        self.device_client = DeviceClient(self.socket_io, json.loads(self.query_params), self.device_id, self.scid)
         recorder_filename = self.device_client.recorder_filename.split(os.sep)[-1]
-        await self.send(format_other_data(recorder_filename.encode()))
+        logging.info(f"【DeviceControl】recorder_filename ({self.device_id}:{self.scid})")
+        self.socket_io.emit("other_data", format_other_data(recorder_filename.encode()))
         try:
-            await asyncio.wait_for(self.device_client.start(), 4)
+            await self.device_client.start()
+
         except Exception as e:
-            await self.close()
-            logging.error(f"【DeviceWebsocketConsumer】({self.device_id}:{self.scid}) start session error {type(e)}!!!")
+            logging.exception(f"&#8203;``【oaicite:0】``&#8203;({self.device_id}:{self.scid}) start session error: {e}!!!")
 
     async def receive(self, text_data=None, bytes_data=None):
         """receive used to control device"""
@@ -78,10 +87,13 @@ class DeviceWebsocketConsumer():
             await self.device_client.controller.inject_text(obj.text)
         # touch
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_TOUCH_EVENT:
-            await self.device_client.controller.inject_touch_event(x=obj.x, y=obj.y, resolution=obj.resolution, action=obj.action)
+            await self.device_client.controller.inject_touch_event(x=obj.x, y=obj.y, resolution=obj.resolution,
+                                                                   action=obj.action)
         # scroll
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_SCROLL_EVENT:
-            await self.device_client.controller.inject_scroll_event(x=obj.x, y=obj.y, distance_x=obj.distance_x, distance_y=obj.distance_y, resolution=obj.resolution)
+            await self.device_client.controller.inject_scroll_event(x=obj.x, y=obj.y, distance_x=obj.distance_x,
+                                                                    distance_y=obj.distance_y,
+                                                                    resolution=obj.resolution)
         # back_or_screen_on
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_BACK_OR_SCREEN_ON:
             if not obj.action:
@@ -92,17 +104,19 @@ class DeviceWebsocketConsumer():
         # get_clipboard
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_GET_CLIPBOARD:
             data = await self.device_client.controller.get_clipboard(copy_key=obj.copy_key)
-            await self.send(bytes_data=format_get_clipboard_data(data))
+            self.socket_io.emit("control", format_get_clipboard_data(data), binary=True)
         # set_clipboard
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_SET_CLIPBOARD:
-            data = await self.device_client.controller.set_clipboard(text=obj.text, sequence=obj.sequence, paste=obj.paste)
-            await self.send(bytes_data=format_set_clipboard_data(data))
+            data = await self.device_client.controller.set_clipboard(text=obj.text, sequence=obj.sequence,
+                                                                     paste=obj.paste)
+            self.socket_io.emit("control", format_set_clipboard_data(data), binary=True)
         # set_screen_power_mode
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_SET_SCREEN_POWER_MODE:
             await self.device_client.controller.set_screen_power_mode(obj.screen_power_mode)
         # swipe
         elif obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_SWIPE_EVENT:
-            await self.device_client.controller.swipe(x=obj.x, y=obj.y, end_x=obj.end_x, end_y=obj.end_y, resolution=obj.resolution, unit=obj.unit, delay=obj.delay)
+            await self.device_client.controller.swipe(x=obj.x, y=obj.y, end_x=obj.end_x, end_y=obj.end_y,
+                                                      resolution=obj.resolution, unit=obj.unit, delay=obj.delay)
         # update resolution
         elif obj.msg_type == 999:
             self.device_client.resolution = obj.resolution
@@ -111,4 +125,5 @@ class DeviceWebsocketConsumer():
         if self.device_client:
             await self.device_client.stop()
             self.device_client = None
-        logging.info(f"【DeviceWebsocketConsumer】({self.device_id}:{self.scid}) =======> disconnected")
+        self.is_connected = False
+        logging.info(f"【DeviceControl】close({self.device_id}:{self.scid}) =======> disconnected")

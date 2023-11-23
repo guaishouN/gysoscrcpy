@@ -14,7 +14,8 @@ class AdbError(Exception):
 class AsyncAdbSocket(AsyncSocket):
     async def connect(self):
         try:
-            self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(ADB_SERVER_ADDR, ADB_SERVER_PORT), self.socket_timeout)
+            self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(ADB_SERVER_ADDR, ADB_SERVER_PORT),
+                                                              self.socket_timeout)
         except Exception as e:
             await self.disconnect()
             if isinstance(e, asyncio.CancelledError):
@@ -32,7 +33,7 @@ class AsyncAdbDevice:
     def cmd_format(cls, cmd):
         return "{:04x}{}".format(len(cmd), cmd).encode("utf-8")
 
-    def __init__(self, device_id, socket_timeout=1):
+    def __init__(self, device_id, socket_timeout=100):
         self.device_id = device_id
         self.socket_timeout = socket_timeout
 
@@ -93,7 +94,8 @@ class AsyncAdbDevice:
                 assert await socket.read_exactly(4) == b'OKAY'
                 await socket.write(self.cmd_format('sync:'))
                 assert await socket.read_exactly(4) == b'OKAY'
-                await socket.write(command.encode("utf-8") + struct.pack("<I", len(path.encode('utf-8'))) + path.encode("utf-8"))
+                await socket.write(
+                    command.encode("utf-8") + struct.pack("<I", len(path.encode('utf-8'))) + path.encode("utf-8"))
                 return socket
             except Exception as e:
                 await socket.disconnect()
@@ -125,7 +127,7 @@ class AsyncAdbDevice:
                 name = await socket.read_string_exactly(namelen)
                 try:
                     mtime = datetime.datetime.fromtimestamp(mtime)
-                except OSError:     # bug in Python 3.6
+                except OSError:  # bug in Python 3.6
                     mtime = datetime.datetime.now()
                 yield {'name': '/'.join([path, name]), 'mtime': mtime, 'mode': mode, 'size': size}
         finally:
@@ -185,22 +187,4 @@ class AsyncAdbDevice:
     async def get_content(self, path):
         return b''.join([_ async for _ in self.iter_content(path)])
 
-
-if __name__ == '__main__':
-    async def test_shell():
-        adb_device = AsyncAdbDevice('ea141ba00521')
-        a = await adb_device.shell('top', stream=True)
-        while True:
-            print(await a.read_string_line())
-    async def test_list_directory():
-        adb_device = AsyncAdbDevice('ea141ba00521')
-        print(await adb_device.list_directory('/sdcard'))
-    async def test_push_file():
-        adb_device = AsyncAdbDevice('ea141ba00521')
-        await adb_device.push_file('scrcpy-server-v1.24', '/sdcard/ccccc')
-    async def test_get_content():
-        adb_device = AsyncAdbDevice('ea141ba00521')
-        print(await adb_device.get_content( '/sdcard/ccccc'))
-
-    asyncio.run(test_get_content())
 
