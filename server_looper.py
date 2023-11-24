@@ -5,11 +5,9 @@ from asyncio import BaseEventLoop, Task
 from concurrent.futures import Future, ThreadPoolExecutor
 import adbutils
 from adbutils import AdbError, AdbTimeout, AdbDeviceInfo
-
+from flask_socketio import SocketIO
 import config
-from app import socketio
 from device_control import DeviceConnector
-
 
 DEVICES_ID_SET: set[str] = set()
 RUNNING_DEVICE_LOOP_DICT: [str, BaseEventLoop] = dict()
@@ -19,6 +17,9 @@ EXECUTOR = ThreadPoolExecutor(max_workers=20, thread_name_prefix="thread_device_
 
 logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',
                     level=logging.INFO)
+
+flask_sio: None | SocketIO = None
+devices_cache: dict[str, DeviceConnector] = {}
 
 
 async def loop_for_detect_device():
@@ -61,7 +62,8 @@ async def loop_for_detect_device():
 
 async def loop_for_run_each_device(device_id):
     logging.info(f"loop_for_run_each_device {device_id}")
-    device_c = DeviceConnector(device_id, socketio)
+    device_c = DeviceConnector(device_id, flask_sio)
+    devices_cache[device_id] = device_c
     running_task = asyncio.create_task(device_c.on_connect())
     RUNNING_DEVICE_TASK_DICT[device_id] = running_task
     try:
@@ -76,11 +78,12 @@ def start_run_loop(device_id) -> (str, Future):
 
     def _thread_for_device():
         logging.info(f"_thread_for_device [{threading.current_thread()}]")
-        working_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(working_loop)
-        RUNNING_DEVICE_LOOP_DICT[device_id] = working_loop
+        device_running_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(device_running_loop)
+        RUNNING_DEVICE_LOOP_DICT[device_id] = device_running_loop
         threading.current_thread().name = f"thread_device_running_loop[{device_id}]"
-        working_loop.run_until_complete(loop_for_run_each_device(device_id))
+        device_running_loop.run_until_complete(loop_for_run_each_device(device_id))
+
     return device_id, EXECUTOR.submit(_thread_for_device)
 
 
@@ -98,4 +101,21 @@ def stop_run_loop(device_id):
     logging.info(f"finally stop [{device_id}] ")
 
 
-asyncio.run(loop_for_detect_device())
+def begin_detect_devices():
+    detect_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(detect_loop)
+    asyncio.run(loop_for_detect_device())
+
+
+def receive(device_id, data):
+    if device_id in RUNNING_DEVICE_LOOP_DICT and device_id in devices_cache:
+        device_running_loop = RUNNING_DEVICE_LOOP_DICT[device_id]
+        asyncio.run_coroutine_threadsafe(devices_cache[device_id].receive(data), device_running_loop)
+
+
+def init(sio: SocketIO) -> Future:
+    if sio:
+        global flask_sio
+        flask_sio = sio
+    return EXECUTOR.submit(begin_detect_devices)
+
