@@ -4,14 +4,14 @@ import threading
 from asyncio import BaseEventLoop, Task
 from concurrent.futures import Future, ThreadPoolExecutor
 import adbutils
-from adbutils import AdbError, AdbTimeout
+from adbutils import AdbError, AdbTimeout, AdbDeviceInfo
 
 import config
 from app import socketio
 from device_control import DeviceConnector
 
 
-DEVICES_ID_SET = set()
+DEVICES_ID_SET: set[str] = set()
 RUNNING_DEVICE_LOOP_DICT: [str, BaseEventLoop] = dict()
 RUNNING_DEVICE_TASK_DICT: [str, Task] = dict()
 RUNNING_DEVICE_THREAD_DICT: dict[str, Future] = dict()
@@ -26,28 +26,32 @@ async def loop_for_detect_device():
     while True:
         try:
             while True:
-                device_list = adb.list()
                 old_set = DEVICES_ID_SET.copy()
                 DEVICES_ID_SET.clear()
-                for info in device_list:
+                [DEVICES_ID_SET.add(info.serial) for info in adb.list()]
+                # deal listed devices
+                for info in adb.list():
                     if info.serial not in old_set and info.state == "device":
+                        logging.info(f"detect: new device connect-> {info.serial} {info.state}")
                         # device_id is the same as info.serial
                         device_id, a_future = start_run_loop(info.serial)
                         RUNNING_DEVICE_THREAD_DICT[device_id] = a_future
-                        DEVICES_ID_SET.add(info.serial)
-                        logging.info(f"detect: new device connect-> {device_id} {info.state}")
                     elif info.serial not in old_set and not info.state == "device":
                         # no deal device
                         continue
                     elif info.serial in old_set and info.state == "device":
                         # normal running device
-                        old_set.remove(info.serial)
                         continue
                     elif info.serial in old_set and not info.state == "device":
                         # should stop running device
-                        logging.info(f"detect: device state failed -> {info.serial} {info.state}")
+                        logging.info(f"detect: device offline -> {info.serial} {info.state}")
+                        stop_run_loop(info.serial)
+                # deal dismiss devices
+                for device_id in old_set:
+                    if device_id not in DEVICES_ID_SET:
+                        logging.info(f"detect: device dismiss -> {device_id}")
+                        stop_run_loop(device_id)
                 await asyncio.sleep(3)
-                [stop_run_loop(d_id) for d_id in old_set]
         except (AdbError, AdbTimeout) as e:
             logging.error(f"abd server error!!{str(e)}")
         finally:
@@ -81,7 +85,7 @@ def start_run_loop(device_id) -> (str, Future):
 
 
 def stop_run_loop(device_id):
-    if device_id in RUNNING_DEVICE_LOOP_DICT:
+    if device_id in RUNNING_DEVICE_LOOP_DICT and device_id in RUNNING_DEVICE_TASK_DICT:
         l: BaseEventLoop = RUNNING_DEVICE_LOOP_DICT[device_id]
         ts: Task = RUNNING_DEVICE_TASK_DICT[device_id]
         l.call_soon_threadsafe(ts.cancel)
