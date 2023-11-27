@@ -7,7 +7,7 @@ import config
 import server_looper
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
 cors = CORS(app)
 room_device_dict = dict()
 logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',

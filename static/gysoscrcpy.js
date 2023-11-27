@@ -267,9 +267,8 @@ function load_websocket() {
         console.log("on other_data: ",message);
     });
 
-    window.ws.on('video_nal', function (msg){
-        let unit8_data = new Uint8Array(msg.data)
-        console.log("on rtp-stream: ", unit8_data.length);
+    window.ws.on('video_nal', function (message){
+        let unit8_data = new Uint8Array(message)
         window.data_size += unit8_data.length
         let start_code = unit8_data.slice(0, 5).join('')
         // 1.视频流数据
