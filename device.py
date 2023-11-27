@@ -13,7 +13,6 @@ from serializers import format_audio_data
 from constants import sc_control_msg_type, sc_copy_key, sc_screen_power_mode
 from constants.input import android_metastate, android_keyevent_action, android_motionevent_action, \
     android_motionevent_buttons
-logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s', level=logging.INFO)
 BASE_DIR = Path(__file__).resolve().parent
 MEDIA_ROOT = '/media/'
 
@@ -311,7 +310,7 @@ class DeviceClient:
                 self.write_recoder(pts, data_length, current_nal_data, typ='video')
                 # 3.向前端发送当前nal
                 self.socket_io.emit("video_nal", current_nal_data, to=self.device_id)
-                print(f"current_nal_data send len={len(current_nal_data)}")
+                # print(f"current_nal_data send len={len(current_nal_data)}")
         except Exception as exc:
             logging.exception(f"_video_task error: {exc}!!!")
         finally:

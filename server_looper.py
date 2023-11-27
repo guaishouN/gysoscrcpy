@@ -52,7 +52,7 @@ async def loop_for_detect_device():
                     if device_id not in DEVICES_ID_SET:
                         logging.info(f"detect: device dismiss -> {device_id}")
                         stop_run_loop(device_id)
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)
         except (AdbError, AdbTimeout) as e:
             logging.error(f"abd server error!!{str(e)}")
         finally:
@@ -108,9 +108,15 @@ def begin_detect_devices():
 
 
 def receive(device_id, data):
+    print(f'{device_id in RUNNING_DEVICE_LOOP_DICT}   {device_id in devices_cache}')
     if device_id in RUNNING_DEVICE_LOOP_DICT and device_id in devices_cache:
-        device_running_loop = RUNNING_DEVICE_LOOP_DICT[device_id]
+        device_running_loop: BaseEventLoop = RUNNING_DEVICE_LOOP_DICT[device_id]
+        print(f'{device_id in RUNNING_DEVICE_LOOP_DICT}   {device_id in devices_cache}  isrunning {device_running_loop.is_running()}')
         asyncio.run_coroutine_threadsafe(devices_cache[device_id].receive(data), device_running_loop)
+
+
+def get_adb_devices_list():
+    return DEVICES_ID_SET
 
 
 def init(sio: SocketIO) -> Future:
