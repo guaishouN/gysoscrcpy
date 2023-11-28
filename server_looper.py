@@ -14,10 +14,6 @@ RUNNING_DEVICE_LOOP_DICT: [str, BaseEventLoop] = dict()
 RUNNING_DEVICE_TASK_DICT: [str, Task] = dict()
 RUNNING_DEVICE_THREAD_DICT: dict[str, Future] = dict()
 EXECUTOR = ThreadPoolExecutor(max_workers=20, thread_name_prefix="thread_device_running_loop")
-
-logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',
-                    level=logging.INFO)
-
 flask_sio: None | SocketIO = None
 devices_cache: dict[str, DeviceConnector] = {}
 
@@ -108,10 +104,8 @@ def begin_detect_devices():
 
 
 def receive(device_id, data):
-    print(f'{device_id in RUNNING_DEVICE_LOOP_DICT}   {device_id in devices_cache}')
     if device_id in RUNNING_DEVICE_LOOP_DICT and device_id in devices_cache:
         device_running_loop: BaseEventLoop = RUNNING_DEVICE_LOOP_DICT[device_id]
-        print(f'{device_id in RUNNING_DEVICE_LOOP_DICT}   {device_id in devices_cache}  isrunning {device_running_loop.is_running()}')
         asyncio.run_coroutine_threadsafe(devices_cache[device_id].receive(data), device_running_loop)
 
 

@@ -33,10 +33,15 @@ class ReceiveMsgObj:
         self.unit = 5
         self.delay = 0.005
 
-    def format_text_data(self, data):
+    def format_text_data(self, data: str):
         data_dict = json.loads(data)
         self.msg_type = data_dict['msg_type']
         for k, v in data_dict.items():
+            setattr(self, k, v)
+
+    def format_dict_data(self, data: dict):
+        self.msg_type = data['msg_type']
+        for k, v in data.items():
             setattr(self, k, v)
 
 

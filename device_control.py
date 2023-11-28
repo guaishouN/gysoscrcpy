@@ -69,13 +69,17 @@ class DeviceConnector:
         except Exception as e:
             logging.exception(f"&#8203;``【oaicite:0】``&#8203;({self.device_id}:{self.scid}) start session error: {e}!!!")
 
-    async def receive(self, text_data=None, bytes_data=None):
-        print("receive------------------------------"+text_data)
+    async def receive(self, data):
+        print("receive------------------------------", type(data), str(data))
         """receive used to control device"""
         if not self.device_client.scrcpy_kwargs['control']:
             return
         obj = ReceiveMsgObj()
-        obj.format_text_data(text_data)
+        if type(data) is dict:
+            obj.format_dict_data(data)
+        else:
+            obj.format_text_data(data)
+
         # keycode
         if obj.msg_type == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_KEYCODE:
             if obj.action is None:
