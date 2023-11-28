@@ -188,7 +188,7 @@ function load_video_player() {
         window.video_player = new Player({
             useWorker: true,
             webgl: 'auto',
-            size: {width: 1336, height: 1720},
+            size: {width: 1920/2, height: 720/2},
             workerFile: "/static/general/js/Decoder.js",
             preserveDrawingBuffer: true
         });
@@ -264,7 +264,7 @@ function load_websocket() {
 
     window.ws.on('other_data', function (message){
         let unit8_data = new Uint8Array(message)
-        console.log("on other_data: ",message);
+        console.log("on other_data: ", unit8_data.length);
     });
 
     window.ws.on('video_nal', function (message){
@@ -369,7 +369,7 @@ $(document).ready(function () {
                             load_audio_player()
                             load_video_player()
                             load_websocket()
-                            //setInterval(flush_duration, 1000);
+                            setInterval(flush_duration, 1000);
                         },
                         error: function (error) {
                             console.error("Error fetching conversations:", error);

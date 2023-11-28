@@ -20,8 +20,16 @@ devices_cache: dict[str, DeviceConnector] = {}
 
 async def loop_for_trace_device():
     adb = adbutils.AdbClient(host=config.ADB_SERVER_ADDR, port=int(config.ADB_SERVER_PORT))
-
+    """
+    True 77053db4 offline
+    False 77053db4 absent
+    True 77053db4 device
+    False 77053db4 absent
+    True 77053db4 offline
+    False 77053db4 absent
+    """
     def trace_devices():
+        print("start trace_devices")
         try:
             for event in adb.track_devices():
                 print(event.present, event.serial, event.status)
@@ -40,7 +48,9 @@ async def loop_for_detect_device():
             while True:
                 old_set = DEVICES_ID_SET.copy()
                 DEVICES_ID_SET.clear()
-                [DEVICES_ID_SET.add(info.serial) for info in adb.list()]
+                [(DEVICES_ID_SET.add(info.serial),
+                  print("detect item:", str(info))
+                  ) for info in adb.list()]
                 # deal listed devices
                 for info in adb.list():
                     if info.serial not in old_set and info.state == "device":
@@ -115,7 +125,7 @@ def stop_run_loop(device_id):
 def begin_detect_devices():
     detect_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(detect_loop)
-    asyncio.run(asyncio.gather(loop_for_detect_device(), loop_for_trace_device()))
+    detect_loop.run_until_complete(asyncio.gather(loop_for_detect_device(), loop_for_trace_device()))
 
 
 def receive(device_id, data):
