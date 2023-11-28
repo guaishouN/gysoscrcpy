@@ -18,6 +18,21 @@ flask_sio: None | SocketIO = None
 devices_cache: dict[str, DeviceConnector] = {}
 
 
+async def loop_for_trace_device():
+    adb = adbutils.AdbClient(host=config.ADB_SERVER_ADDR, port=int(config.ADB_SERVER_PORT))
+
+    def trace_devices():
+        try:
+            for event in adb.track_devices():
+                print(event.present, event.serial, event.status)
+        except AdbError as e:
+            logging.error(f"adb server loss {e}")
+        finally:
+            logging.info(f"adb server stop!!!!!!")
+
+    await asyncio.to_thread(trace_devices)
+
+
 async def loop_for_detect_device():
     adb = adbutils.AdbClient(host=config.ADB_SERVER_ADDR, port=int(config.ADB_SERVER_PORT))
     while True:
@@ -37,7 +52,7 @@ async def loop_for_detect_device():
                         # no deal device
                         continue
                     elif info.serial in old_set and info.state == "device":
-                        # normal running device
+                        # normal running device, if connect failed, stop loop
                         continue
                     elif info.serial in old_set and not info.state == "device":
                         # should stop running device
@@ -100,7 +115,7 @@ def stop_run_loop(device_id):
 def begin_detect_devices():
     detect_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(detect_loop)
-    asyncio.run(loop_for_detect_device())
+    asyncio.run(asyncio.gather(loop_for_detect_device(), loop_for_trace_device()))
 
 
 def receive(device_id, data):
@@ -118,4 +133,3 @@ def init(sio: SocketIO) -> Future:
         global flask_sio
         flask_sio = sio
     return EXECUTOR.submit(begin_detect_devices)
-
