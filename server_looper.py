@@ -18,6 +18,14 @@ flask_sio: None | SocketIO = None
 devices_cache: dict[str, DeviceConnector] = {}
 
 
+def join_device(sid, device_id):
+    if device_id in devices_cache:
+        connector = devices_cache[device_id]
+        if connector.device_client and len(connector.device_client.h264_sps_pps_nal) > 0:
+            flask_sio.emit("video_nal", connector.device_client.h264_sps_pps_nal, to=device_id)
+    return None
+
+
 async def loop_for_trace_device():
     adb = adbutils.AdbClient(host=config.ADB_SERVER_ADDR, port=int(config.ADB_SERVER_PORT))
     """

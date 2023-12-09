@@ -2,7 +2,6 @@ let send_fun
 function attach_canvas(isControl, canvas, a_send) {
     send_fun = a_send
     let playerElement = $('#container')
-    playerElement.innerHTML = ""
     playerElement.append(canvas)
     // canvas control support
     if (isControl !== false) {

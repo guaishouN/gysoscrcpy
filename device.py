@@ -8,6 +8,7 @@ import datetime
 
 from flask_socketio import SocketIO
 
+from find_sps_pps import find_sps_pps
 from tools.adb import AsyncAdbDevice
 from serializers import format_audio_data
 from constants import sc_control_msg_type, sc_copy_key, sc_screen_power_mode
@@ -190,6 +191,8 @@ class DeviceClient:
     connect_timeout = 300
 
     def __init__(self, socket_io: SocketIO, scrcpy_kwargs, device_id, scid):
+        # 关键帧
+        self.h264_sps_pps_nal = bytes()
         # scrcpy参数
         self.scrcpy_kwargs = scrcpy_kwargs
         # devices
@@ -306,6 +309,7 @@ class DeviceClient:
                 pts = struct.unpack('>Q', frame_meta[:8])[0]
                 data_length = struct.unpack('>L', frame_meta[8:])[0]
                 current_nal_data = await self.video_socket.read_exactly(data_length)
+                print(f"vedio current_nal_data {current_nal_data.hex()}")
                 # 2.向录屏工具写入 当前nal
                 self.write_recoder(pts, data_length, current_nal_data, typ='video')
                 # 3.向前端发送当前nal
@@ -362,7 +366,9 @@ class DeviceClient:
         pts = struct.unpack('>Q', frame_meta[:8])[0]
         data_length = struct.unpack('>L', frame_meta[8:])[0]
         video_config_nal = await self.video_socket.read_exactly(data_length)
-        self.socket_io.emit("video_header", video_config_nal)
+        self.h264_sps_pps_nal = video_config_nal
+        self.socket_io.emit("video_nal", video_config_nal, to=self.device_id)
+        print(f"vedio video_config_nal {video_config_nal.hex()}")
         self.video_audio_info['video_header'] = [pts, data_length, video_config_nal]
         # 2.audio_config_packet
         if self.scrcpy_kwargs['audio']:
@@ -370,7 +376,7 @@ class DeviceClient:
             pts = struct.unpack('>Q', frame_meta[:8])[0]
             data_length = struct.unpack('>L', frame_meta[8:])[0]
             audio_config_nal = await self.audio_socket.read_exactly(data_length)
-            self.socket_io.emit("audio_header", format_audio_data(audio_config_nal))
+            self.socket_io.emit("audio_nal", format_audio_data(audio_config_nal), to=self.device_id)
             self.video_audio_info['audio_header'] = [pts, data_length, audio_config_nal]
 
     async def start(self):

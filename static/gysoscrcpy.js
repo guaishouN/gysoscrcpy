@@ -158,30 +158,6 @@ function load_audio_player() {
     }
 }
 
-function toHex(value) {
-    return value.toString(16).padStart(2, "0").toUpperCase();
-}
-
-function toUint32Le(data, offset) {
-    return (
-        data[offset] |
-        (data[offset + 1] << 8) |
-        (data[offset + 2] << 16) |
-        (data[offset + 3] << 24)
-    );
-}
-
-function handle_config_data(data) {
-    if (window.video_config_data !== undefined) {
-        let fix_data = new Uint8Array(window.video_config_data.byteLength + data.byteLength)
-        fix_data.set(window.video_config_data, 0)
-        fix_data.set(data, window.video_config_data.byteLength)
-        data = fix_data
-        window.video_config_data = undefined
-    }
-    return data
-}
-
 function load_video_player() {
     window.canvas_resolution = [0, 0];
     if ($('#video_play_select').text()) {
@@ -205,6 +181,7 @@ function load_video_player() {
                 update_resolution();
             }
             window.video_player.decode(data);
+            console.log("video_nal data size = "+data_size, ", nal="+data.toString());
         }
         window.video_renderer_canvas = attach_canvas(controlInfo.control, window.video_player.canvas, function (data) {
             window.ws.emit('device_event', {device_id: current_device_id, msg:data});
@@ -249,22 +226,22 @@ function load_websocket() {
 
     window.ws.on('audio_nal', function (message){
         let unit8_data = new Uint8Array(message)
-        console.log("on audio_nal: ",unit8_data.length);
+        console.log("on audio_nal: ", unit8_data.toString());
     });
 
     window.ws.on('video_header', function (message){
         let unit8_data = new Uint8Array(message)
-        console.log("on video_header: ",unit8_data.length);
+        console.log("on video_header: ", unit8_data.toString());
     });
 
     window.ws.on('audio_header', function (message){
         let unit8_data = new Uint8Array(message)
-        console.log("on audio_header: ",unit8_data.length);
+        console.log("on audio_header: ", unit8_data.toString());
     });
 
     window.ws.on('other_data', function (message){
         let unit8_data = new Uint8Array(message)
-        console.log("on other_data: ", unit8_data.length);
+        console.log("on other_data: ", unit8_data.toString());
     });
 
     window.ws.on('video_nal', function (message){
