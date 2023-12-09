@@ -70,7 +70,6 @@ class DeviceConnector:
             logging.exception(f"&#8203;``【oaicite:0】``&#8203;({self.device_id}:{self.scid}) start session error: {e}!!!")
 
     async def receive(self, data):
-        print("receive------------------------------", type(data), str(data))
         """receive used to control device"""
         if not self.device_client.scrcpy_kwargs['control']:
             return

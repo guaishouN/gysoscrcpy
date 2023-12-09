@@ -34,9 +34,9 @@ class DeviceController:
             await self.device.control_socket.write(msg)
 
     async def inject_without_lock(self, msg):
-        print(f"begin inject_without_lock msg  {msg}")
+        logging.info(f"begin inject_without_lock msg  {msg}")
         await self.device.control_socket.write(msg)
-        print(f"finished inject_without_lock msg  {msg}")
+        logging.info(f"finished inject_without_lock msg  {msg}")
         loop = asyncio.get_running_loop()
 
     async def inject_keycode(self, keycode, action=android_keyevent_action.AKEY_EVENT_ACTION_DOWN, repeat=0,
@@ -122,7 +122,7 @@ class DeviceController:
                 msg_type, msg_lens = struct.unpack('>BI', _meta)
                 return await self.device.control_socket.read_exactly(msg_lens)
             except Exception as e:
-                print(f'no clipborad ! {e}')
+                logging.info(f'no clipborad ! {e}')
                 return b''
 
     async def set_clipboard(self, text, sequence=1, paste=True):
@@ -197,7 +197,7 @@ class DeviceClient:
         self.scrcpy_kwargs = scrcpy_kwargs
         # devices
         self.device_id = device_id
-        print(f"device_id  {device_id}  ")
+        logging.info(f"device_id  {device_id}  ")
         self.adb_device = AsyncAdbDevice(self.device_id)
         # 单个安卓设备上scrcpy进程的投屏id
         self.scrcpy_kwargs['scid'] = self.scid = scid
@@ -252,7 +252,7 @@ class DeviceClient:
     async def deploy_server(self):
         # 1.推送jar包
         server_file_path = "scrcpy-server"
-        print(f"path file {server_file_path } is exist = {os.path.exists(server_file_path)}")
+        logging.info(f"path file {server_file_path } is exist = {os.path.exists(server_file_path)}")
         await self.adb_device.push_file(server_file_path, "/data/local/tmp/scrcpy-server.jar")
         # 2.启动一个adb socket去部署scrcpy_server
         commands = [
@@ -309,12 +309,12 @@ class DeviceClient:
                 pts = struct.unpack('>Q', frame_meta[:8])[0]
                 data_length = struct.unpack('>L', frame_meta[8:])[0]
                 current_nal_data = await self.video_socket.read_exactly(data_length)
-                print(f"vedio current_nal_data {current_nal_data.hex()}")
+                logging.debug(f"vedio current_nal_data {current_nal_data.hex()}")
                 # 2.向录屏工具写入 当前nal
                 self.write_recoder(pts, data_length, current_nal_data, typ='video')
                 # 3.向前端发送当前nal
                 self.socket_io.emit("video_nal", current_nal_data, to=self.device_id)
-                print(f"current_nal_data send len={len(current_nal_data)}")
+                logging.debug(f"current_nal_data send len={len(current_nal_data)}")
         except Exception as exc:
             logging.exception(f"_video_task error: {exc}!!!")
         finally:
@@ -368,7 +368,7 @@ class DeviceClient:
         video_config_nal = await self.video_socket.read_exactly(data_length)
         self.h264_sps_pps_nal = video_config_nal
         self.socket_io.emit("video_nal", video_config_nal, to=self.device_id)
-        print(f"vedio video_config_nal {video_config_nal.hex()}")
+        logging.debug(f"vedio video_config_nal {video_config_nal.hex()}")
         self.video_audio_info['video_header'] = [pts, data_length, video_config_nal]
         # 2.audio_config_packet
         if self.scrcpy_kwargs['audio']:

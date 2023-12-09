@@ -37,10 +37,10 @@ async def loop_for_trace_device():
     False 77053db4 absent
     """
     def trace_devices():
-        print("start trace_devices")
+        logging.info("start trace_devices")
         try:
             for event in adb.track_devices():
-                print(event.present, event.serial, event.status)
+                logging.info(f"{event.present, event.serial, event.status}")
         except AdbError as e:
             logging.error(f"adb server loss {e}")
         finally:
@@ -57,7 +57,7 @@ async def loop_for_detect_device():
                 old_set = DEVICES_ID_SET.copy()
                 DEVICES_ID_SET.clear()
                 [(DEVICES_ID_SET.add(info.serial),
-                  print("detect item:", str(info))
+                  # logging.info(f"detect item:{str(info)}")
                   ) for info in adb.list()]
                 # deal listed devices
                 for info in adb.list():

@@ -7,14 +7,17 @@ import config
 import server_looper
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
+socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
 cors = CORS(app)
 room_device_dict = dict()
 logging.basicConfig(format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',
-                    level=logging.INFO)
-
-
-# logging.getLogger("asyncio").setLevel(logging.WARNING)
+                    level=logging.ERROR)
+logging.getLogger("asyncio").setLevel(logging.ERROR)
+# Disable Werkzeug logs
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+# Disable Flask logs
+app.logger.setLevel(logging.ERROR)
 server_looper.init(socketio)
 
 
@@ -41,20 +44,20 @@ def get_control_info(device_id):
 @socketio.on('connect')
 def handle_connect():
     sid = request.sid
-    print(f'Client connected {sid}')
+    logging.info(f'Client connected {sid}')
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
-    print(f'Client disconnected {sid}')
+    logging.info(f'Client disconnected {sid}')
     if sid in room_device_dict:
         leave_room(room_device_dict[sid])
 
 
 @socketio.on('device_control')
 def handle_device_control(data):
-    print('handle_device_control:', data)
+    logging.info(f'handle_device_control:{str(data)}')
 
 
 @socketio.on('join_device')
@@ -76,7 +79,7 @@ def handle_leave_room(data):
 
 @socketio.on('device_event')
 def handle_screen_event(data):
-    print(f'handle_screen_event:{data["msg"]} device_id {data["device_id"]} ')
+    logging.info(f'handle_screen_event:{data["msg"]} device_id {data["device_id"]} ')
     server_looper.receive(data["device_id"], data["msg"])
 
 # if __name__ == '__main__':
