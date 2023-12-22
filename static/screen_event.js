@@ -135,11 +135,11 @@ function throttle(fn, during) {
 
 // 获取鼠标在元素内的坐标
 function get_pointer_position(event, ele) {
-    x = event.clientX - ele.offsetLeft + window.scrollX;
+    let x = event.clientX - ele.offsetLeft + window.scrollX;
     x = parseInt(x);
     x = Math.min(x, ele.width);
     x = Math.max(x, 0);
-    y = event.clientY - ele.offsetTop + window.scrollY;
+    let y = event.clientY - ele.offsetTop + window.scrollY;
     y = parseInt(y);
     y = Math.min(y, ele.height);
     y = Math.max(y, 0);
@@ -165,7 +165,7 @@ function add_canvas_touch_event(ele) {
             this.removeEventListener("mousemove", efficient_canvas_mouse_move)
             let pix_data = get_pointer_position(event, this)
             inject_touch_event(pix_data, 0)
-            this.on('mousemove', efficient_canvas_mouse_move)
+            $(this).on('mousemove', efficient_canvas_mouse_move)
         }
     })
     // 2.mouseup
@@ -174,7 +174,7 @@ function add_canvas_touch_event(ele) {
             window.touch_start = false
             let pix_data = get_pointer_position(event, this)
             inject_touch_event(pix_data, 1)
-            this.removeEventListener("mousemove", efficient_canvas_mouse_move)
+            $(this).off("mousemove", efficient_canvas_mouse_move)
         }
     })
     // 3.mouseout
@@ -183,7 +183,7 @@ function add_canvas_touch_event(ele) {
             window.touch_start = false
             let pix_data = get_pointer_position(event, this)
             inject_touch_event(pix_data, 1)
-            this.removeEventListener("mousemove", efficient_canvas_mouse_move)
+            $(this).off("mousemove", efficient_canvas_mouse_move)
         }
     })
 }

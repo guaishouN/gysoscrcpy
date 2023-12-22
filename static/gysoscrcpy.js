@@ -184,6 +184,7 @@ function load_video_player() {
             console.log("video_nal data size = "+data_size, ", nal="+data.toString());
         }
         window.video_renderer_canvas = attach_canvas(controlInfo.control, window.video_player.canvas, function (data) {
+            console.log(JSON.stringify(data))
             window.ws.emit('device_event', {device_id: current_device_id, msg:data});
         })
     }

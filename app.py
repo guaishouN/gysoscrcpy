@@ -69,6 +69,7 @@ def handle_join_room(data):
     join_room(join_device)
     server_looper.join_device(sid, join_device)
 
+
 @socketio.on('leave_device')
 def handle_leave_room(data):
     leave_device = data['device_id']
