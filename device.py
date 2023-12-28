@@ -1,14 +1,9 @@
 import os
-import json
 import struct
 import logging
 import asyncio
 from pathlib import Path
-import datetime
-
 from flask_socketio import SocketIO
-
-from find_sps_pps import find_sps_pps
 from tools.adb import AsyncAdbDevice
 from serializers import format_audio_data
 from constants import sc_control_msg_type, sc_copy_key, sc_screen_power_mode
